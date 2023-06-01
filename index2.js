@@ -23,6 +23,7 @@ function createGrid() {
         y: y * squareSize,
         blue: 0,
         value: 0,
+        connections: [],
         weights: generateWeights(),
       };
     }
@@ -41,48 +42,33 @@ function generateWeights() {
 function fireRandomNode() {
   const randomX = Math.floor(Math.random() * gridSize);
   const randomY = Math.floor(Math.random() * gridSize);
-  grid[randomX][randomY].value = Math.floor(Math.random() * 128);
+  const node = grid[randomX][randomY];
+  if (node.value > 512) {
+    return;
+  }
+  node.value = Math.floor(Math.random() * 128);
 }
+
+const decayFactor = 0.95; // Adjust this value to control the decay rate
 
 function updateGrid() {
   const updatedGrid = JSON.parse(JSON.stringify(grid));
 
-  //fireRandomNode();
+  fireRandomNode();
 
   for (let x = 0; x < gridSize; x++) {
     for (let y = 0; y < gridSize; y++) {
-
-
-      if(grid[x][y].value > 512) {
-        grid[x][y].cooldown = 2;
-      } else if(grid[x][y].cooldown > 0) {
-        grid[x][y].cooldown--;
-      }
-
       const node = grid[x][y];
       const neighbors = getNeighbors(x, y);
       const neighborValues = neighbors.map(neighbor => grid[neighbor.x][neighbor.y].value);
-      grid[x][y].blue = weightedSoftmax(neighborValues);
-      const weightedValues = neighborValues.map((value, index) => value * node.weights[index]);
-      var softmaxValue = weightedSoftmax(weightedValues);
-      if(!grid[x][y].cooldown) {
-        updatedGrid[x][y].value = softmaxValue;
-      } else {
-        updatedGrid[x][y].value = softmaxValue;
-      }
+      const weightedSum = neighborValues.reduce((sum, value, index) => sum + value * node.weights[index], 0);
+      const newValue = weightedSum > 0 ? weightedSum : 0;
+      const decayedValue = node.value * decayFactor; // Apply the decay factor to the current value
+      updatedGrid[x][y].value = newValue // Limit the maximum value to 255
     }
   }
 
   grid.splice(0, grid.length, ...updatedGrid);
-}
-
-function weightedSoftmax(values) {
-  const maxVal = Math.max(...values);
-  const expValues = values.map(value => Math.exp(value - maxVal));
-  const sumExpValues = expValues.reduce((sum, value) => sum + value, 0);
-  const softmaxValues = expValues.map(value => value / sumExpValues);
-  const weightedSum = softmaxValues.reduce((sum, value, index) => sum + value * values[index], 0);
-  return weightedSum;
 }
 
 function getNeighbors(x, y) {
@@ -110,9 +96,9 @@ function renderGrid() {
       const square = new RectangleShape(new Vector2I(squareSize, squareSize));
       square.setPosition(grid[x][y].x, grid[x][y].y);
       if (grid[x][y].value > 250) {
-        square.setFillColor(new Color(255, 0, grid[x][y].blue * 255));
+        square.setFillColor(new Color(255, 0, 0));
       } else {
-        square.setFillColor(new Color(grid[x][y].value, 0, grid[x][y].blue * 255));
+        square.setFillColor(new Color(grid[x][y].value, 0, 0));
       }
       window.draw(square);
     }
@@ -132,7 +118,7 @@ function gameLoop() {
       const position = Mouse.getPosition(window);
       const x = Math.floor(position.x / squareSize);
       const y = Math.floor(position.y / squareSize);
-      grid[x][y].value = 1024;
+      grid[x][y].value = 1;
     }
   }
 
